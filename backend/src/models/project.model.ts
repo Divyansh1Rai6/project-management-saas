@@ -21,6 +21,13 @@ const projectSchema = new mongoose.Schema(
             enum: [...PROJECT_STATUSES],
             default: "Planning",
         },
+
+        owner: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            index: true,
+        },
     },
     {
         timestamps: true,

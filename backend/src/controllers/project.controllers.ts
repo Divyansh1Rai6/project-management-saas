@@ -2,11 +2,19 @@
 import type { Request, Response } from "express";
 import * as projectService from "../services/project.service.js";
 import ApiError from "../utils/ApiError.js";
-import asyncHandler from "../utils/asyncHandler.js";
+import asyncHandler from "../utils/asyncHandler.js";  
+
+const getAuthenticatedUserId = (req: Request): string => {
+  if(!req.userId) {
+    throw new ApiError(401, "Authentication required");
+  }
+
+  return req.userId;
+};
 
 export const createProject = asyncHandler(
   async (req: Request, res: Response) => {
-    const project = await projectService.createProject(req.body);
+    const project = await projectService.createProject(req.body, getAuthenticatedUserId(req));
 
     res.status(201).json({
       success: true,
@@ -17,8 +25,8 @@ export const createProject = asyncHandler(
 );
 
 export const getProjects = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const projects = await projectService.getProjects();
+  async (req: Request, res: Response) => {
+    const projects = await projectService.getProjects(getAuthenticatedUserId(req));
 
     res.status(200).json({
       success: true,
@@ -36,7 +44,7 @@ export const getProjectById = asyncHandler(
       throw new ApiError(400, "Invalid project ID");
     }
 
-    const project = await projectService.getProjectById(id);
+    const project = await projectService.getProjectById(id, getAuthenticatedUserId(req));
 
     res.status(200).json({
       success: true,
@@ -53,7 +61,7 @@ export const updateProject = asyncHandler(
       throw new ApiError(400, "Invalid project ID");
     }
 
-    const project = await projectService.updateProject(id, req.body);
+    const project = await projectService.updateProject(id, req.body, getAuthenticatedUserId(req));
 
     res.status(200).json({
       success: true,
@@ -71,7 +79,7 @@ export const deleteProject = asyncHandler(
       throw new ApiError(400, "Invalid project ID");
     }
 
-    await projectService.deleteProject(id);
+    await projectService.deleteProject(id, getAuthenticatedUserId(req));
 
     res.status(200).json({
       success: true,
