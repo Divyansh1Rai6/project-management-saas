@@ -28,7 +28,14 @@ const projectSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        workspace: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Workspace",
+            required: true,
+            index: true,
+        },
     },
+
     {
         timestamps: true,
     }

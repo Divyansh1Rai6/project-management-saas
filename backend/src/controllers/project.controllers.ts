@@ -12,9 +12,15 @@ const getAuthenticatedUserId = (req: Request): string => {
   return req.userId;
 };
 
+
 export const createProject = asyncHandler(
   async (req: Request, res: Response) => {
-    const project = await projectService.createProject(req.body, getAuthenticatedUserId(req));
+    const userId = getAuthenticatedUserId(req);
+
+    const project = await projectService.createProject(
+      req.body,
+      userId
+    );
 
     res.status(201).json({
       success: true,
@@ -24,9 +30,19 @@ export const createProject = asyncHandler(
   }
 );
 
+
 export const getProjects = asyncHandler(
   async (req: Request, res: Response) => {
-    const projects = await projectService.getProjects(getAuthenticatedUserId(req));
+    const userId = getAuthenticatedUserId(req);
+    const workspaceId = req.query.workspaceId;
+
+    if(typeof workspaceId !== "string") {
+      throw new ApiError(
+        400,
+        "Workspace ID is required"
+      );
+    }
+    const projects = await projectService.getProjects(userId, workspaceId);
 
     res.status(200).json({
       success: true,

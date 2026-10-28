@@ -3,11 +3,13 @@ import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import type { PROJECT_STATUSES, ProjectStatus } from "../types/project.types.js";
 import ApiError from "../utils/ApiError.js";
+import Workspace from "../models/workspace.model.js";
 
 interface CreateProjectData {
     name: string;
     description: string;
     status?: ProjectStatus;
+    workspaceId: string;
 }
 
 interface UpdateProjectData {
@@ -20,16 +22,41 @@ export const createProject = async (
     data: CreateProjectData,
     userId: string
 ) => {
+    if (!mongoose.isValidObjectId(data.workspaceId)) {
+        throw new ApiError(400, "Invalid workspace ID");
+    }
+
+    const workspace = await Workspace.findOne({
+        _id: data.workspaceId,
+        owner: userId,
+    });
+    if (!workspace) {
+        throw new ApiError(404, "Workspace not found");
+    }
     const project = await Project.create({
-        ...data,
+        name: data.name,
+        description: data.description,
+        status: data.status,
         owner: new mongoose.Types.ObjectId(userId),
+        workspace: workspace._id,
     });
 
     return project;
 };
 
-export const getProjects = async (userId: string) => {
-    return Project.find({ owner: userId }).sort({ createdAt: -1 });
+export const getProjects = async (userId: string, workspaceId: string) => {
+    if(!mongoose.isValidObjectId(workspaceId)) {
+        throw new ApiError(400, "Invalid workspace ID");
+    }
+
+    const workspace = await Workspace.findOne({
+        _id: workspaceId,
+        owner: userId,
+    });
+    if(!workspace) {
+        throw new ApiError(404, "Workspaace not found");
+    }
+    return Project.find({ owner: userId, workspace: workspace._id, }).sort({ createdAt: -1 });
 };
 
 export const getProjectById = async (id: string, userId: string) => {
@@ -57,7 +84,10 @@ export const updateProject = async (
 
     const project = await Project.findOneAndUpdate(
         { _id: id, owner: userId },
-        data,
+
+        {
+            $set: data,
+        },
         { new: true, runValidators: true }
     );
 

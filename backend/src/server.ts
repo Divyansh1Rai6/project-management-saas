@@ -4,6 +4,7 @@ import projectRoutes from "./routes/project.routes.js"
 import errorMiddleware from "./middlewares/error.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import workspaceRoutes from "./routes/workspace.routes.js";
 const app = express();
 
 
@@ -25,6 +26,8 @@ app.use("/api/auth", authRoutes);
 app.use(errorMiddleware);
 
 app.use("/api/users", userRoutes);
+
+app.use("/api/workspaces", workspaceRoutes);
 
 connectDB();
 
