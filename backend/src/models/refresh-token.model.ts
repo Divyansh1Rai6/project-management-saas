@@ -10,8 +10,13 @@ const refreshTokenSchema = new mongoose.Schema(
         },
         tokenHash: {
             type: String,
-            reqired: true,
+            required: true,
             unique: true,
+        },
+        familyId: {
+            type: String,
+            required: true,
+            index: true,
         },
         expiresAt: {
             type: Date,
@@ -23,10 +28,10 @@ const refreshTokenSchema = new mongoose.Schema(
             default: null,
         },
     },
-    {
-            timestamps: true,
-        }
+    { timestamps: true }
 );
+
+refreshTokenSchema.index({ familyId: 1, revokedAt: 1 });
 
 const RefreshToken = mongoose.model(
     "RefreshToken",

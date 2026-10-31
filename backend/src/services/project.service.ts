@@ -4,6 +4,8 @@ import Project from "../models/project.model.js";
 import type { PROJECT_STATUSES, ProjectStatus } from "../types/project.types.js";
 import ApiError from "../utils/ApiError.js";
 import Workspace from "../models/workspace.model.js";
+import Task from "../models/task.model.js";
+import { Session } from "node:inspector";
 
 interface CreateProjectData {
     name: string;
@@ -45,7 +47,7 @@ export const createProject = async (
 };
 
 export const getProjects = async (userId: string, workspaceId: string) => {
-    if(!mongoose.isValidObjectId(workspaceId)) {
+    if (!mongoose.isValidObjectId(workspaceId)) {
         throw new ApiError(400, "Invalid workspace ID");
     }
 
@@ -53,7 +55,7 @@ export const getProjects = async (userId: string, workspaceId: string) => {
         _id: workspaceId,
         owner: userId,
     });
-    if(!workspace) {
+    if (!workspace) {
         throw new ApiError(404, "Workspaace not found");
     }
     return Project.find({ owner: userId, workspace: workspace._id, }).sort({ createdAt: -1 });
@@ -102,15 +104,36 @@ export const deleteProject = async (id: string, userId: string) => {
     if (!mongoose.isValidObjectId(id)) {
         throw new ApiError(400, "Invalid project ID");
     }
+    const session = await mongoose.startSession();
 
-    const project = await Project.findOneAndDelete({
-        _id: id,
-        owner: userId,
-    });
+    try {
+        session.startTransaction();
 
-    if (!project) {
-        throw new ApiError(404, "Project not found");
+        const project = await Project.findOne({
+            _id: id,
+            owner: userId,
+        }).session(session);
+
+
+        if (!project) {
+            throw new ApiError(404, "Project not found");
+        }
+        await Task.deleteMany({
+            project: project._id,
+            owner: userId,
+        },
+            { session }
+        );
+
+        await project.deleteOne({ session });
+
+        await session.commitTransaction();
+
+        return project;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        await session.endSession();
     }
-
-    return project;
 };

@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import revokedToken from "../models/revoked-token.model.js";
 import RefreshToken from "../models/refresh-token.model.js";
+import mongoose from "mongoose";
 
 
 export const registerUser = async (data: RegisterInput) => {
@@ -78,6 +79,7 @@ export const loginUser = async (data: LoginInput) => {
 
     const refreshToken = generateRefreshToken();
     const refreshTokenHash = hashRefreshToken(refreshToken);
+    const familyId = crypto.randomUUID();
 
     const expiresAt = new Date(
         Date.now() + 7 * 24 * 60 * 60 * 1000
@@ -86,6 +88,7 @@ export const loginUser = async (data: LoginInput) => {
     await RefreshToken.create({
         user: user._id,
         tokenHash: refreshTokenHash,
+        familyId,
         expiresAt,
     });
 
@@ -101,29 +104,6 @@ export const loginUser = async (data: LoginInput) => {
 };
 
 export const logoutUser = async (token: string, refreshToken: string) => {
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-        throw new ApiError(500, "Authentication configuration error");
-    }
-
-    let expiry: number;
-
-    try {
-        const verified = jwt.verify(token, secret);
-
-        if (
-            typeof verified === "string" ||
-            typeof verified.exp !== "number"
-        ) {
-            throw new Error("Invalid token payload");
-        }
-
-        expiry = verified.exp;
-    } catch {
-        throw new ApiError(401, "Invalid or expired authentication token");
-    }
-
     const refreshTokenHash = hashRefreshToken(refreshToken);
 
     const storedRefreshToken = await RefreshToken.findOne({
@@ -132,44 +112,56 @@ export const logoutUser = async (token: string, refreshToken: string) => {
         expiresAt: { $gt: new Date() },
     });
 
-    let userId: string;
+    if (!storedRefreshToken) {
+        throw new ApiError(401, "Invalid or expired refresh token");
+    }
+
+    let userId: string | undefined;
+    let expiry: number | undefined;
+
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret) {
+        throw new ApiError(500, "Authentication configuration error");
+    }
 
     try {
-        const decoded = jwt.verify(token, secret);
-        if(
-            typeof decoded === "string" || typeof decoded.userId !== "string"
+        const decoded = jwt.verify(token, secret, {
+            ignoreExpiration: true,
+        });
+        if (
+            typeof decoded !== "string" && typeof decoded.userId === "string" && typeof decoded.exp === "number"
         ) {
-            throw new Error("Inavlid token payload");
+            userId = decoded.userId;
+            expiry = decoded.exp;
         }
 
-        userId = decoded.userId;
-
     } catch {
-        throw new ApiError(401, "Invalid authentication token");
-    }  
+        // Expired access token is allowed during logout.
+    }
 
-    if(
-        !storedRefreshToken || storedRefreshToken.user.toString() !== userId
+    if (
+        userId && storedRefreshToken.user.toString() !== userId
     ) {
         throw new ApiError(401, "Invalid refresh token")
     }
+    if (expiry) {
+        const tokenHash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
 
-    const tokenHash = crypto
-        .createHash("sha256")
-        .update(token)
-        .digest("hex");
-
-    await revokedToken.updateOne(
-        { tokenHash },
-        {
-            $setOnInsert: {
-                tokenHash,
-                expiresAt: new Date(expiry * 1000),
+        await revokedToken.updateOne(
+            { tokenHash },
+            {
+                $setOnInsert: {
+                    tokenHash,
+                    expiresAt: new Date(expiry * 1000),
+                },
             },
-        },
-        { upsert: true }
-    );
-
+            { upsert: true }
+        );
+    }
     const result = await RefreshToken.updateOne(
         {
             _id: storedRefreshToken._id,
@@ -180,7 +172,7 @@ export const logoutUser = async (token: string, refreshToken: string) => {
         }
     );
 
-    if(result.modifiedCount !== 1) {
+    if (result.modifiedCount !== 1) {
         throw new ApiError(401, "Refresh token has already been used");
     }
 
@@ -197,62 +189,129 @@ const hashRefreshToken = (token: string): string => {
 };
 
 export const refreshAccessToken = async (refreshToken: string) => {
-    const tokenHash = hashRefreshToken(refreshToken);
-
-    const storedToken = await RefreshToken.findOne({
-        tokenHash,
-        revokedAt: null,
-        expiresAt: { $gt: new Date() },
-    });
-
-    if (!storedToken) {
-        throw new ApiError(401, "Invalid or expired refresh token");
-    }
-
-    const user = await User.findById(storedToken.user);
-
-    if (!user) {
-        throw new ApiError(401, "User no longer exists");
-    }
-
-    const consumedToken = await RefreshToken.findOneAndUpdate(
-        {
-            _id: storedToken._id,
-            revokedAt: null,
-            expiresAt: { $gt: new Date() },
-        },
-        {
-            $set: { revokedAt: new Date() },
-        },
-        { new: true }
-    );
-
-    if (!consumedToken) {
-        throw new ApiError(401, "Refresh token has already been used");
-    }
-
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
         throw new ApiError(500, "Authentication configuration error");
     }
 
-    const token = jwt.sign(
-        { userId: user._id.toString() },
-        secret,
-        { expiresIn: "15m" }
-    );
+    const tokenHash = hashRefreshToken(refreshToken);
+    const session = await mongoose.startSession();
 
-    const newRefreshToken = generateRefreshToken();
+    let result: {
+        token: string;
+        refreshToken: string;
+    } | undefined;
 
-    await RefreshToken.create({
-        user: user._id,
-        tokenHash: hashRefreshToken(newRefreshToken),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
+    let reuseDetected = false;
 
-    return {
-        token,
-        refreshToken: newRefreshToken,
-    };
+    try {
+        await session.withTransaction(async () => {
+            const storedToken = await RefreshToken.findOne({
+                tokenHash,
+            }).session(session);
+
+            if (!storedToken) {
+                throw new ApiError(
+                    401,
+                    "Invalid or expired refresh token"
+                );
+            }
+
+            // Previously consumed token: revoke its entire family.
+            if (storedToken.revokedAt) {
+                await RefreshToken.updateMany(
+                    {
+                        familyId: storedToken.familyId,
+                        revokedAt: null,
+                    },
+                    {
+                        $set: { revokedAt: new Date() },
+                    },
+                    { session }
+                );
+
+                reuseDetected = true;
+                return;
+            }
+
+            if (storedToken.expiresAt <= new Date()) {
+                throw new ApiError(
+                    401,
+                    "Invalid or expired refresh token"
+                );
+            }
+
+            const user = await User.findById(storedToken.user)
+                .session(session);
+
+            if (!user) {
+                throw new ApiError(401, "User no longer exists");
+            }
+
+            const consumedToken = await RefreshToken.findOneAndUpdate(
+                {
+                    _id: storedToken._id,
+                    revokedAt: null,
+                    expiresAt: { $gt: new Date() },
+                },
+                {
+                    $set: { revokedAt: new Date() },
+                },
+                {
+                    new: true,
+                    session,
+                }
+            );
+
+            if (!consumedToken) {
+                throw new ApiError(
+                    401,
+                    "Refresh token has already been used"
+                );
+            }
+
+            const accessToken = jwt.sign(
+                { userId: user._id.toString() },
+                secret,
+                { expiresIn: "15m" }
+            );
+
+            const newRefreshToken = generateRefreshToken();
+
+            await RefreshToken.create(
+                [{
+                    user: user._id,
+                    tokenHash: hashRefreshToken(newRefreshToken),
+                    familyId: storedToken.familyId,
+                    expiresAt: new Date(
+                        Date.now() + 7 * 24 * 60 * 60 * 1000
+                    ),
+                }],
+                { session }
+            );
+
+            result = {
+                token: accessToken,
+                refreshToken: newRefreshToken,
+            };
+        });
+
+        // Throw AFTER transaction commits, otherwise revocations roll back.
+        if (reuseDetected) {
+            throw new ApiError(
+                401,
+                "Refresh token reuse detected. Please log in again."
+            );
+        }
+
+        if (!result) {
+            throw new ApiError(500, "Token refresh failed");
+        }
+
+        return result;
+
+    } finally {
+        await session.endSession();
+    }
 };

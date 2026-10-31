@@ -1,6 +1,7 @@
 import Workspace from "../models/workspace.model.js";
 import ApiError from "../utils/ApiError.js";
 import Project from "../models/project.model.js";
+import mongoose from "mongoose";
 interface CreateWorkspaceInput {
     name: string;
 }
@@ -22,7 +23,7 @@ export const createWorkspace = async (
 
 export const getUserWorkspaces = async (userId: string) => {
     return Workspace.find({ owner: userId })
-    .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 });
 };
 
 export const getWorkspaceById = async (
@@ -34,7 +35,7 @@ export const getWorkspaceById = async (
         owner: userId,
     });
 
-    if(!workspace) {
+    if (!workspace) {
         throw new ApiError(404, "Workspace not found");
     }
     return workspace;
@@ -71,24 +72,41 @@ export const deleteWorkspace = async (
     userId: string,
     workspaceId: string
 ) => {
-    const workspace = await Workspace.findOne({
-        _id: workspaceId,
-        owner: userId,
-    });
-
-    if(!workspace) {
-        throw new ApiError(404, "Workspace not found");
+    if (!mongoose.isValidObjectId(workspaceId)) {
+        throw new ApiError(400, "Invalid project ID");
     }
-    const hasProjects = await Project.exists({
-        workspace: workspace._id,
-    });
-    if(hasProjects) {
-        throw new ApiError(
-            409,
-            "Cannot delete workspace because it contains projects"
-        );
-    }
+    const session = await mongoose.startSession();
 
-    await workspace.deleteOne();
-    return workspace;
-};
+    try {
+        session.startTransaction();
+
+        const workspace = await Workspace.findOne({
+            _id: workspaceId,
+            owner: userId,
+        }).session(session);
+
+        if (!workspace) {
+            throw new ApiError(404, "Workspace not found");
+        }
+        const hasProjects = await Project.exists({
+            workspace: workspace._id,
+        });
+        if (hasProjects) {
+            throw new ApiError(
+                409,
+                "Cannot delete workspace because it contains projects"
+            );
+        }
+
+        await workspace.deleteOne({ session });
+
+        await session.commitTransaction();
+
+        return workspace;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        await session.endSession();
+    }
+}
