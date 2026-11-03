@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+const passwordSchema = z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .refine(
+        (value) => Buffer.byteLength(value, "utf8") <= 72,
+        "Password cannot exceed 72 bytes"
+    );
+
 export const registerSchema = z.object({
     name: z
         .string()
@@ -14,11 +22,8 @@ export const registerSchema = z.object({
         .max(254, "Email is too long")
         .transform((value) => value.toLowerCase()),
 
-        password: z
-            .string()
-            .min(8, "Password must be atleast 8 characters")
-            .max(72, "Password cannot exceed 72 characters"),
-});
+        password: passwordSchema,
+}).strict();
 
 export type  RegisterInput = z.infer<typeof registerSchema>
 
@@ -33,7 +38,10 @@ export const loginSchema = z.object({
     password: z
     .string()
     .min(1, "Password is required")
-    .max(72, "Password cannot exceed 72 characters"),
-});
+    .refine(
+        (value) => Buffer.byteLength(value, "utf8") <=72,
+        "Password cannot exceed 72 bytes"
+    ),
+}).strict();
 
 export type LoginInput = z.infer<typeof loginSchema>;

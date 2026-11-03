@@ -4,18 +4,13 @@ import ApiError from "../utils/ApiError.js";
 
 import { createWorkspace, getUserWorkspaces, getWorkspaceById, updateWorkspace, deleteWorkspace } from "../services/workspace.service.js";
 
-import { createdWorkspaceSchema, updateWorkspaceSchema } from "../validation/workspace.validator.js";
-import Workspace from "../models/workspace.model.js";
-
 export const create = asyncHandler(
     async (req: Request, res: Response) => {
         if (!req.userId) {
             throw new ApiError(401, "Authentication required");
         }
 
-        const data = createdWorkspaceSchema.parse(req.body);
-
-        const workspace = await createWorkspace(req.userId, data);
+        const workspace = await createWorkspace(req.userId, req.body);
 
         res.status(201).json({
             success: true,
@@ -69,8 +64,6 @@ export const update = asyncHandler(
             throw new ApiError(401, "Authentication required");
         }
 
-        const data = updateWorkspaceSchema.parse(req.body);
-
         const workspaceId = req.params.id;
         if(typeof workspaceId !== "string") {
             throw new ApiError(400, "Invalid workspace ID");
@@ -78,7 +71,7 @@ export const update = asyncHandler(
         const workspace = await updateWorkspace(
             req.userId,
             workspaceId,
-            data
+            req.body
         );
         res.status(200).json({
             success: true,

@@ -73,7 +73,7 @@ export const deleteWorkspace = async (
     workspaceId: string
 ) => {
     if (!mongoose.isValidObjectId(workspaceId)) {
-        throw new ApiError(400, "Invalid project ID");
+        throw new ApiError(400, "Invalid workspace ID");
     }
     const session = await mongoose.startSession();
 
@@ -90,7 +90,8 @@ export const deleteWorkspace = async (
         }
         const hasProjects = await Project.exists({
             workspace: workspace._id,
-        });
+            owner: userId,
+        }).session(session);
         if (hasProjects) {
             throw new ApiError(
                 409,
@@ -104,7 +105,9 @@ export const deleteWorkspace = async (
 
         return workspace;
     } catch (error) {
-        await session.abortTransaction();
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
         throw error;
     } finally {
         await session.endSession();

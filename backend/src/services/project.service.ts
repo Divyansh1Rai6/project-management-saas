@@ -5,7 +5,7 @@ import type { PROJECT_STATUSES, ProjectStatus } from "../types/project.types.js"
 import ApiError from "../utils/ApiError.js";
 import Workspace from "../models/workspace.model.js";
 import Task from "../models/task.model.js";
-import { Session } from "node:inspector";
+
 
 interface CreateProjectData {
     name: string;
@@ -56,7 +56,7 @@ export const getProjects = async (userId: string, workspaceId: string) => {
         owner: userId,
     });
     if (!workspace) {
-        throw new ApiError(404, "Workspaace not found");
+        throw new ApiError(404, "Workspace not found");
     }
     return Project.find({ owner: userId, workspace: workspace._id, }).sort({ createdAt: -1 });
 };
@@ -131,7 +131,9 @@ export const deleteProject = async (id: string, userId: string) => {
 
         return project;
     } catch (error) {
-        await session.abortTransaction();
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
         throw error;
     } finally {
         await session.endSession();

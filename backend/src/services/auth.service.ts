@@ -103,6 +103,7 @@ export const loginUser = async (data: LoginInput) => {
     };
 };
 
+
 export const logoutUser = async (token: string, refreshToken: string) => {
     const refreshTokenHash = hashRefreshToken(refreshToken);
 
@@ -116,36 +117,37 @@ export const logoutUser = async (token: string, refreshToken: string) => {
         throw new ApiError(401, "Invalid or expired refresh token");
     }
 
-    let userId: string | undefined;
-    let expiry: number | undefined;
-
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
         throw new ApiError(500, "Authentication configuration error");
     }
 
+    let decoded;
+
     try {
-        const decoded = jwt.verify(token, secret, {
+        decoded = jwt.verify(token, secret, {
             ignoreExpiration: true,
         });
-        if (
-            typeof decoded !== "string" && typeof decoded.userId === "string" && typeof decoded.exp === "number"
-        ) {
-            userId = decoded.userId;
-            expiry = decoded.exp;
-        }
-
     } catch {
-        // Expired access token is allowed during logout.
+        throw new ApiError(401, "Invalid authentication token");
     }
 
     if (
-        userId && storedRefreshToken.user.toString() !== userId
+        typeof decoded === "string" ||
+        typeof decoded.userId !== "string" ||
+        !mongoose.Types.ObjectId.isValid(decoded.userId) ||
+        typeof decoded.exp !== "number"
     ) {
-        throw new ApiError(401, "Invalid refresh token")
+        throw new ApiError(401, "Invalid authentication token");
     }
-    if (expiry) {
+
+    if (storedRefreshToken.user.toString() !== decoded.userId) {
+        throw new ApiError(401, "Invalid refresh token");
+    }
+
+    // Revoke access token only if it has not already expired.
+    if (decoded.exp * 1000 > Date.now()) {
         const tokenHash = crypto
             .createHash("sha256")
             .update(token)
@@ -156,12 +158,13 @@ export const logoutUser = async (token: string, refreshToken: string) => {
             {
                 $setOnInsert: {
                     tokenHash,
-                    expiresAt: new Date(expiry * 1000),
+                    expiresAt: new Date(decoded.exp * 1000),
                 },
             },
             { upsert: true }
         );
     }
+
     const result = await RefreshToken.updateOne(
         {
             _id: storedRefreshToken._id,
@@ -178,6 +181,7 @@ export const logoutUser = async (token: string, refreshToken: string) => {
 
     return { message: "Logged out successfully" };
 };
+
 
 
 const generateRefreshToken = (): string => {
@@ -215,6 +219,16 @@ export const refreshAccessToken = async (refreshToken: string) => {
                 throw new ApiError(
                     401,
                     "Invalid or expired refresh token"
+                );
+            }
+
+            if (
+                typeof storedToken.familyId !== "string" ||
+                !storedToken.familyId
+            ) {
+                throw new ApiError(
+                    401,
+                    "Session expired. Please log in again."
                 );
             }
 

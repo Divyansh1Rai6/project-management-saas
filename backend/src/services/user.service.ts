@@ -1,3 +1,4 @@
+
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 
@@ -9,12 +10,14 @@ export const getCurrentUser = async (userId: string) => {
     if (!user) {
         throw new ApiError(404, "User not found");
     }
+
     return user;
 };
 
 export const updateCurrentUser = async (
     userId: string,
-    data: { name: string }) => {
+    data: { name: string }
+) => {
     const user = await User.findByIdAndUpdate(
         userId,
         {
@@ -24,12 +27,13 @@ export const updateCurrentUser = async (
         },
         {
             new: true,
-            runvalidators: true,
+            runValidators: true,
         }
     ).select("name email createdAt updatedAt");
 
     if (!user) {
         throw new ApiError(404, "User not found");
     }
+
     return user;
-}
+};

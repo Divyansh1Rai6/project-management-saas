@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { minLength } from "zod";
 
 const workspaceSchema = new mongoose.Schema(
     {
@@ -10,7 +9,6 @@ const workspaceSchema = new mongoose.Schema(
             minlength: 2,
             maxlength: 100,
         },
-
         owner: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",

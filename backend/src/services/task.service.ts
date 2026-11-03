@@ -4,13 +4,13 @@ import Task from "../models/task.model.js";
 import Project from "../models/project.model.js";
 import Workspace from "../models/workspace.model.js";
 import ApiError from "../utils/ApiError.js";
-import { StringValidation } from "zod/v3";
+
 
 interface CreateTaskData {
     title: string;
     description?: string;
     status?: "Todo" | "In-progress" | "Done";
-    prirority?: "Low" | "Medium" | "High" | "Urgent";
+    priority?: "Low" | "Medium" | "High" | "Urgent";
     dueDate?: string | null;
     projectId: string;
 }
@@ -62,7 +62,7 @@ export const createTask = async (
         title: data.title,
         description: data.description ?? "",
         status: data.status,
-        priority: data.prirority,
+        priority: data.priority,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         project: project._id,
         workspace: project.workspace,

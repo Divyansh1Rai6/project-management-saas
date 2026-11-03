@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../types/task.types.js";
-import { required } from "zod/mini";
 
 const taskSchema = new mongoose.Schema(
     {

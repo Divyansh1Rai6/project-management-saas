@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
 
+import mongoose from "mongoose";
 
 const revokedTokenSchema = new mongoose.Schema(
     {
@@ -7,7 +7,6 @@ const revokedTokenSchema = new mongoose.Schema(
             type: String,
             required: true,
             unique: true,
-            index: true,
         },
         expiresAt: {
             type: Date,
@@ -16,10 +15,11 @@ const revokedTokenSchema = new mongoose.Schema(
         },
     },
     { timestamps: true }
-)
-const revokedToken = mongoose.model(
+);
+
+const RevokedToken = mongoose.model(
     "RevokedToken",
     revokedTokenSchema
 );
 
-export default revokedToken;
+export default RevokedToken;

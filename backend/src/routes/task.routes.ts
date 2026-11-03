@@ -3,7 +3,7 @@ import authMiddleware from "../middlewares/auth.middleware.js";
 import validate from "../middlewares/validation.middleware.js";
 import { createTaskSchema, updateTaskSchema } from "../validation/task.validator.js";
 import { createTask, getTaskById, getTasks, updateTask, deleteTask } from "../controllers/task.controller.js";
-import { ro } from "zod/locales";
+
 
 const router = Router();
 

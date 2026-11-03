@@ -5,6 +5,8 @@ class ApiError extends Error {
     constructor(statusCode: number, message: string) {
         super(message);
 
+        Object.setPrototypeOf(this, new.target.prototype);
+
         this.statusCode = statusCode;
         this.isOperational = true;
 

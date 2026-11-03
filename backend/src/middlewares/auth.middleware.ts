@@ -1,4 +1,4 @@
-
+import mongoose from "mongoose";
 import type { Request, Response, NextFunction } from "express";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import crypto from "node:crypto";
@@ -56,7 +56,8 @@ const authMiddleware = asyncHandler(
 
         if (
             typeof decoded === "string" ||
-            typeof decoded.userId !== "string"
+            typeof decoded.userId !== "string" ||
+            !mongoose.Types.ObjectId.isValid(decoded.userId)
         ) {
             throw new ApiError(
                 401,

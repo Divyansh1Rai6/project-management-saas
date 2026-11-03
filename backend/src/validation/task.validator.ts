@@ -39,6 +39,22 @@ export const updateTaskSchema = z
             .min(1, "Task title cannot be empty")
             .max(150, "Task title cannot exceed 150 characters")
             .optional(),
+
+        description: z
+            .string()
+            .trim()
+            .max(2000, "Description cannot exceed 2000 characters")
+            .optional(),
+
+        status: z.enum(TASK_STATUSES).optional(),
+
+        priority: z.enum(TASK_PRIORITIES).optional(),
+
+        dueDate: z
+            .iso
+            .datetime({ offset: true })
+            .nullable()
+            .optional(),
     })
     .strict()
     .refine((data) => Object.keys(data).length > 0, {
