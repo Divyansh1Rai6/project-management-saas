@@ -1,0 +1,22 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Git files
+.git
+.gitignore
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+coverage
+npm-debug.log*
+*.log
+
+# OS files
+.DS_Store

@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
-import "dotenv/config"
-
+import "dotenv/config";
 
 const connectDB = async (): Promise<void> => {
     const mongoURI = process.env.MONGODB_URI;
@@ -8,13 +7,24 @@ const connectDB = async (): Promise<void> => {
     if (!mongoURI) {
         throw new Error("MONGODB_URI is not defined in environment variables");
     }
+
     try {
         await mongoose.connect(mongoURI);
-
         console.log("MONGODB connected successfully");
-    } catch (error)  {
-        console.error("MONGODB connection failed:", error);
+    }   catch (error) {
+        console.error("MONGODB connection failed:" , error);
         throw error;
-    } 
+    }
 };
+
+export const disconnectDB = async (): Promise<void> => {
+    try {
+        await mongoose.disconnect();
+        console.log("MONGODB disconnected successfully");
+    }   catch (error) {
+        console.error("MONGODB disconnection failed:", error);
+        throw error;
+    }
+};
+
 export default connectDB;

@@ -4,7 +4,7 @@
 !.env.example
 
 # Dependencies
-node_moudles/
+node_modules/
 
 # Build output
 dist/
