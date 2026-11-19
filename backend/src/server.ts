@@ -1,3 +1,6 @@
+import "dotenv/config";
+import cors from "cors";
+import cookieParser from "cookie-parser";
 import express from "express";
 import type { Server } from "node:http";
 import connectDB, { disconnectDB } from "./config/database.js";
@@ -13,7 +16,23 @@ const app = express();
 
 const PORT = Number(process.env.PORT) || 5000;
 
-app.use(express.json());
+const allowedOrigins = (
+    process.env.FRONTEND_URLS || "http://localhost:3000"
+)
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+app.use(
+    cors({
+        origin: allowedOrigins,
+        credentials: true,
+    })
+);
+
+app.use(cookieParser());
+
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/",(req, res) => {
     res.status(200).json({
