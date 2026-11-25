@@ -1,12 +1,27 @@
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bell, Menu, Plus, Check, MessageSquare, AlertTriangle, UserPlus, Settings, User, LogOut, ChevronRight } from 'lucide-react';
+import {
+  Bell,
+  Menu,
+  Plus,
+  Check,
+  MessageSquare,
+  AlertTriangle,
+  UserPlus,
+  Settings,
+  User,
+  LogOut,
+  ChevronRight,
+} from 'lucide-react';
+
 import { cn } from '@/lib/utils';
-import { notifications as initialNotifications, currentUser } from '@/lib/mock-data';
+import { notifications as initialNotifications } from '@/lib/mock-data';
 import { GlobalSearch } from '@/components/dashboard/global-search';
+import type { DashboardUser } from './dashboard-shell';
 
 const notifIcon = {
   message: MessageSquare,
@@ -24,27 +39,56 @@ const notifColor = {
 
 type TopbarProps = {
   onMenuClick: () => void;
+  user: DashboardUser | null;
 };
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({ onMenuClick, user }: TopbarProps) {
   const router = useRouter();
+
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifList, setNotifList] = useState(initialNotifications);
 
   const unreadCount = notifList.filter((n) => !n.read).length;
 
+  const userInitials = user?.name
+    ? user.name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase()
+    : 'U';
+
   const markAllRead = () => {
     setNotifList((list) => list.map((n) => ({ ...n, read: true })));
   };
 
   const toggleRead = (id: string) => {
-    setNotifList((list) => list.map((n) => (n.id === id ? { ...n, read: !n.read } : n)));
+    setNotifList((list) =>
+      list.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
+    );
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setProfileOpen(false);
-    router.push('/login');
+
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+
+      if (!response.ok) {
+        console.error('Logout request failed:', response.status);
+      }
+    } catch (error) {
+      console.error('Logout request error:', error);
+    } finally {
+      router.replace('/login');
+      router.refresh();
+    }
   };
 
   const profileLinks = [
@@ -83,6 +127,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
+
             {unreadCount > 0 && (
               <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
                 {unreadCount}
@@ -92,19 +137,27 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
           {notifOpen && (
             <>
-              <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setNotifOpen(false)}
+              />
+
               <div
                 className="absolute right-0 z-40 mt-2 w-80 origin-top-right rounded-xl border border-border bg-popover shadow-lg"
                 style={{ animation: 'scale-in 0.2s ease-out' }}
               >
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                  <span className="text-sm font-semibold text-foreground">Notifications</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    Notifications
+                  </span>
+
                   <div className="flex items-center gap-2">
                     {unreadCount > 0 && (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         {unreadCount} new
                       </span>
                     )}
+
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllRead}
@@ -115,38 +168,63 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                     )}
                   </div>
                 </div>
+
                 <div className="max-h-80 overflow-y-auto">
                   {notifList.map((n) => {
                     const Icon = notifIcon[n.icon];
+
                     return (
                       <button
                         key={n.id}
                         onClick={() => toggleRead(n.id)}
                         className={cn(
                           'flex w-full gap-3 border-b border-border/60 px-4 py-3 text-left transition-colors last:border-0 hover:bg-muted/50',
-                          !n.read && 'bg-primary/[0.03]',
+                          !n.read && 'bg-primary/[0.03]'
                         )}
                       >
-                        <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', notifColor[n.icon])}>
+                        <div
+                          className={cn(
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                            notifColor[n.icon]
+                          )}
+                        >
                           <Icon className="h-4 w-4" />
                         </div>
+
                         <div className="min-w-0 flex-1">
-                          <p className={cn('text-sm', n.read ? 'font-normal text-muted-foreground' : 'font-medium text-foreground')}>
+                          <p
+                            className={cn(
+                              'text-sm',
+                              n.read
+                                ? 'font-normal text-muted-foreground'
+                                : 'font-medium text-foreground'
+                            )}
+                          >
                             {n.title}
                           </p>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.description}</p>
-                          <p className="mt-1 text-[11px] text-muted-foreground/80">{n.time}</p>
+
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                            {n.description}
+                          </p>
+
+                          <p className="mt-1 text-[11px] text-muted-foreground/80">
+                            {n.time}
+                          </p>
                         </div>
+
                         <span
                           className={cn(
                             'mt-1.5 h-2 w-2 shrink-0 rounded-full transition-colors',
-                            n.read ? 'bg-transparent ring-1 ring-inset ring-border' : 'bg-primary',
+                            n.read
+                              ? 'bg-transparent ring-1 ring-inset ring-border'
+                              : 'bg-primary'
                           )}
                         />
                       </button>
                     );
                   })}
                 </div>
+
                 <button className="w-full border-t border-border py-2.5 text-center text-sm font-medium text-primary transition-colors hover:bg-muted/50">
                   View all notifications
                 </button>
@@ -164,28 +242,39 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             className="flex items-center gap-2 rounded-lg p-1 pr-2 transition-colors hover:bg-muted"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 text-xs font-semibold text-white">
-              {currentUser.initials}
+              {userInitials}
             </div>
-            <span className="hidden text-sm font-medium text-foreground lg:inline">{currentUser.name}</span>
+
+            <span className="hidden text-sm font-medium text-foreground lg:inline">
+              {user?.name || 'Loading...'}
+            </span>
           </button>
 
           {profileOpen && (
             <>
-              <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setProfileOpen(false)}
+              />
+
               <div
                 className="absolute right-0 z-40 mt-2 w-56 origin-top-right rounded-xl border border-border bg-popover shadow-lg"
                 style={{ animation: 'scale-in 0.2s ease-out' }}
               >
                 <div className="border-b border-border px-4 py-3">
-                  <p className="text-sm font-semibold text-foreground">{currentUser.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{currentUser.email}</p>
-                  <span className="mt-1.5 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                    {currentUser.role}
-                  </span>
+                  <p className="text-sm font-semibold text-foreground">
+                    {user?.name || 'Loading...'}
+                  </p>
+
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user?.email || ''}
+                  </p>
                 </div>
+
                 <div className="py-1">
                   {profileLinks.map((item) => {
                     const Icon = item.icon;
+
                     return (
                       <Link
                         key={item.label}
@@ -200,6 +289,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                     );
                   })}
                 </div>
+
                 <div className="border-t border-border py-1">
                   <button
                     onClick={handleLogout}

@@ -1,5 +1,8 @@
 import { ArrowRight, TrendingUp } from 'lucide-react';
-import { DashboardShell } from '@/components/dashboard/dashboard-shell';
+import {
+  DashboardShell,
+  DashboardGreeting,
+} from '@/components/dashboard/dashboard-shell';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { ProjectCard } from '@/components/dashboard/project-card';
 import { TaskItem } from '@/components/dashboard/task-item';
@@ -24,9 +27,7 @@ export default function Home() {
           </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
-                Good morning, Alex
-              </h1>
+              <DashboardGreeting />
               <p className="mt-1 text-sm text-muted-foreground">
                 You have <span className="font-semibold text-foreground">{tasksTodo} tasks</span> remaining today. Let&apos;s make progress.
               </p>

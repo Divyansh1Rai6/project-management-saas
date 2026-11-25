@@ -114,46 +114,100 @@ export default function WorkspacesPage() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    if (!validate()) {
-      setFormError('Please fix the highlighted fields before saving.');
-      return;
-    }
-    setSaving(true);
-    setTimeout(() => {
-      try {
-        if (isEditing) {
-          setWorkspaces((prev) =>
-            prev.map((w) =>
-              w.id === draft.id ? { ...w, name: draft.name, description: draft.description, color: draft.color, icon: draft.icon } : w,
-            ),
-          );
-          toast({ title: 'Workspace updated', description: `"${draft.name}" has been saved.` });
-        } else {
-          const newW: Workspace = {
-            id: `w${Date.now()}`,
-            name: draft.name,
-            description: draft.description || 'No description yet',
-            color: draft.color,
-            icon: draft.icon,
-            projectCount: 0,
-            memberCount: 1,
-            members: [members.am],
-            createdAt: 'Just now',
-          };
-          setWorkspaces((prev) => [newW, ...prev]);
-          toast({ title: 'Workspace created', description: `"${draft.name}" is ready to use.` });
-        }
-        setModalOpen(false);
-      } catch {
-        toast({ title: 'Something went wrong', description: 'Could not save the workspace. Please try again.', variant: 'destructive' });
-      } finally {
-        setSaving(false);
+  
+const handleSave = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setFormError("");
+
+  if (!validate()) {
+    setFormError("Please fix the highlighted fields before saving.");
+    return;
+  }
+
+  setSaving(true);
+
+  try {
+    if (isEditing) {
+      // Existing edit behavior remains local for now.
+      setWorkspaces((prev) =>
+        prev.map((w) =>
+          w.id === draft.id
+            ? {
+                ...w,
+                name: draft.name.trim(),
+                description: draft.description,
+                color: draft.color,
+                icon: draft.icon,
+              }
+            : w,
+        ),
+      );
+
+      toast({
+        title: "Workspace updated",
+        description: `"${draft.name}" has been saved.`,
+      });
+    } else {
+      // Create workspace through our Next.js API route.
+      const response = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: draft.name.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || "Unable to create workspace",
+        );
       }
-    }, 400);
-  };
+
+      const workspace = result.data;
+
+      const newW: Workspace = {
+        id: workspace.id,
+        name: workspace.name,
+        description: draft.description || "No description yet",
+        color: draft.color,
+        icon: draft.icon,
+        projectCount: 0,
+        memberCount: 1,
+        members: [members.am],
+        createdAt: "Just now",
+      };
+
+      setWorkspaces((prev) => [newW, ...prev]);
+
+      toast({
+        title: "Workspace created",
+        description: `"${workspace.name}" is ready to use.`,
+      });
+    }
+
+    setModalOpen(false);
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Could not save the workspace. Please try again.";
+
+    setFormError(message);
+
+    toast({
+      title: isEditing ? "Update failed" : "Workspace creation failed",
+      description: message,
+      variant: "destructive",
+    });
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const confirmDelete = () => {
     if (!deleteTarget) return;

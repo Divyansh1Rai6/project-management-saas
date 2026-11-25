@@ -1,5 +1,5 @@
 'use client';
-
+import type { DashboardUser } from './dashboard-shell';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -27,9 +27,10 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 type SidebarProps = {
   open: boolean;
   onClose: () => void;
+  user: DashboardUser | null;
 };
 
-export function Sidebar({ open, onClose }: SidebarProps) {
+export function Sidebar({ open, onClose, user }: SidebarProps) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
@@ -128,11 +129,19 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <div className="border-t border-border p-3">
           <div className="flex items-center gap-3 rounded-lg px-2 py-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-xs font-semibold text-white">
-              AM
+              {user?.name
+              ? user.name
+              .trim()
+              .split(/\s+/)
+              .slice(0, 2)
+              .map((part) => part[0])
+              .join('')
+              .toUpperCase()
+              : 'U'}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">Alex Morgan</p>
-              <p className="truncate text-xs text-muted-foreground">Product Lead</p>
+              <p className="truncate text-sm font-medium text-foreground">{user?.name || 'Loading...'}</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email || ' '}</p>
             </div>
           </div>
         </div>
